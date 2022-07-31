@@ -67,3 +67,21 @@ def interpolate_distance(points, distance):
         even_points.append(points[-1])
 
     return even_points
+
+def isTrackReverted(track1, track2, num_points):
+    """ Tests whether two tracks are likely to be a reversal of each other or not """
+    # Ensure num_points is no greater than the length of either track
+    num_points = min(num_points, len(track1), len(track2))
+
+    def displacement(track1, track2, index1, index2):
+        """ Returns distance between track1[index1] and track2[index2] """
+        return gpxpy.geo.distance(track1[index1].latitude, track1[index1].longitude, None, track2[index2].latitude, track2[index2].longitude, None)
+
+    sum_displacement_regular = 0
+    sum_displacement_opposite = 0
+
+    for i in range(num_points):
+        sum_displacement_regular += displacement(track1, track2, i, i)
+        sum_displacement_opposite += displacement(track1, track2, i, -i)
+
+        return sum_displacement_regular <= sum_displacement_opposite
