@@ -50,3 +50,7 @@ celerybeat-schedule
 
 # python3 venv
 venv/
+
+# tests
+alignment.png
+files/
