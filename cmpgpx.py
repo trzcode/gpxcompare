@@ -20,6 +20,7 @@ import numpy
 import geo
 import gfx
 
+ignoreElevation = False
 
 def align_tracks(track1, track2, gap_penalty):
     """ Needleman-Wunsch algorithm adapted for gps tracks. """
@@ -68,6 +69,23 @@ def align_tracks(track1, track2, gap_penalty):
             j -= 1
     return a1, a2
 
+def isReverted(track1, track2, num_points):
+    """ Tests whether two tracks are likely to be a reversal of each other or not """
+    # Ensure num_points is no greater than the length of either track
+    num_points = min(num_points, len(track1), len(track2))
+
+    def displacement(track1, track2, index1, index2):
+        """ Returns distance between track1[index1] and track2[index2] """
+        return gpxpy.geo.distance(track1[index1].latitude, track1[index1].longitude, None, track2[index2].latitude, track2[index2].longitude, None)
+
+    sum_displacement_regular = 0
+    sum_displacement_opposite = 0
+
+    for i in range(num_points):
+        sum_displacement_regular += displacement(track1, track2, i, i)
+        sum_displacement_opposite += displacement(track1, track2, i, -i)
+
+        return sum_displacement_regular <= sum_displacement_opposite
 
 def draw_alignment(track1, track2, bounds):
     """ Draws the aligned tracks with the given bounds onto a cairo surface. """
@@ -124,11 +142,16 @@ if __name__ == "__main__":
                         help="output filename")
     parser.add_argument('-s', '--separate_tracks', action='store_true',
                         help="output original tracks to separate images")
+    parser.add_argument('-i', '--ignore-elevation', action='store_true')
     args = parser.parse_args()
 
     if args.debug:
         _log.setLevel(logging.DEBUG)
         logging.getLogger('geotiler.tilenet').setLevel(logging.DEBUG)
+
+    if args.ignore_elevation:
+        _log.info('Ignoring elevation')
+        ignoreElevation = True
 
     gpx1 = gpxpy.parse(args.gpx_file1)
     gpx2 = gpxpy.parse(args.gpx_file2)
@@ -137,6 +160,10 @@ if __name__ == "__main__":
     # Join all the points from all segments for the track into a single list
     gpx1_points = [p for s in gpx1.tracks[0].segments for p in s.points]
     gpx2_points = [p for s in gpx2.tracks[0].segments for p in s.points]
+    
+    if isReverted(gpx1_points, gpx2_points, 40):
+        _log.info("Detected a track that needs to be reversed")
+        gpx1_points.reverse()
 
     # Evenly distribute the points
     if args.even:
